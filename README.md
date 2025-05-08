@@ -166,3 +166,34 @@ export PYTHONPATH="${PYTHONPATH}:/path/to/the/AutoPrompt/repo"
   year = {2020}
 }
 ```
+
+
+///
+
+Commands to follow to run AutoPrompt on your local
+
+
+conda create -n py37
+conda activate py37
+conda config --env --set subdir osx-64
+conda install python=3.7
+pip install -r requirements.txt
+<!-- mkdir -p glue_data                     
+curl -L -o SST-2.zip https://dl.fbaipublicfiles.com/glue/data/SST-2.zip
+unzip SST-2.zip -d glue_data/ -->
+
+python -m autoprompt.create_trigger \             
+  --train data/harmful_jailbreak/train.jsonl \
+  --dev data/harmful_jailbreak/dev.jsonl \
+  --template '[T] [T] [T] {input} This is [P].' \
+  --initial-trigger '[MASK]' '[MASK]' '[MASK]' \
+  --model-name bert-base-cased \
+  --bsz 32 \
+  --eval-size 32 \
+  --iters 50 \
+  --accumulation-steps 10 \
+  --tokenize-labels \
+  --debug
+
+Test your model
+python -m autoprompt.test_trigger_tokens.py  
