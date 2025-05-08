@@ -50,6 +50,7 @@ class PredictWrapper:
         predict_mask = model_inputs.pop('predict_mask')
         model_inputs = replace_trigger_tokens(model_inputs, trigger_ids, trigger_mask)
         logits, *_ = self._model(**model_inputs)
+        print("predict_mask.sum():", predict_mask.sum())  # should NOT be 0
         predict_logits = logits.masked_select(predict_mask.unsqueeze(-1)).view(logits.size(0), -1)
         return predict_logits
 
@@ -164,12 +165,32 @@ def replace_trigger_tokens(model_inputs, trigger_ids, trigger_mask):
     return out
 
 
+# def get_loss(predict_logits, label_ids):
+#     predict_logp = F.log_softmax(predict_logits, dim=-1)
+#     target_logp = predict_logp.gather(-1, label_ids)
+#     target_logp = target_logp - 1e32 * label_ids.eq(0)  # Apply mask
+#     target_logp = torch.logsumexp(target_logp, dim=-1)
+#     return -target_logp
+
 def get_loss(predict_logits, label_ids):
     predict_logp = F.log_softmax(predict_logits, dim=-1)
-    target_logp = predict_logp.gather(-1, label_ids)
-    target_logp = target_logp - 1e32 * label_ids.eq(0)  # Apply mask
-    target_logp = torch.logsumexp(target_logp, dim=-1)
+
+    if label_ids.dim() > 1:
+        label_ids = label_ids.squeeze(-1)
+    if label_ids.dim() == 0:
+        label_ids = label_ids.unsqueeze(0)
+
+    # 🧪 PRINT SHAPE AND RANGE
+    print("label_ids:", label_ids)
+    print("predict_logp.shape:", predict_logp.shape)
+
+    # 🛑 Check for out-of-bounds values
+    if torch.any(label_ids >= predict_logp.size(1)):
+        raise ValueError(f"One or more label_ids exceed vocab size ({predict_logp.size(1)})")
+
+    target_logp = predict_logp.gather(1, label_ids.unsqueeze(1)).squeeze(1)
     return -target_logp
+
 
 
 def isupper(idx, tokenizer):
